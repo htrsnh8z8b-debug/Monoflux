@@ -2666,7 +2666,7 @@ do
                             Library:AttemptSave();
                         end;
                     end;
-                end);
+                });
 
                 Table:UpdateButton();
                 Dropdown:Display();
