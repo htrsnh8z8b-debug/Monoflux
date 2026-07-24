@@ -3753,7 +3753,6 @@ function Library:CreateWindow(...)
         return Tab;
     end;
 
-    -- Сохраняем ссылку на активное окно для ресайза
     Library.ActiveWindow = Outer;
 
     local ModalElement = Library:Create('TextButton', {
@@ -3852,7 +3851,6 @@ end;
 Players.PlayerAdded:Connect(OnPlayerChange);
 Players.PlayerRemoving:Connect(OnPlayerChange);
 
--- ========== МОБИЛЬНЫЙ ИНТЕРФЕЙС (с изменениями) ==========
 if InputService.TouchEnabled then
     local MobileGui = Instance.new("ScreenGui")
     MobileGui.Name = "LinoriaMobileUI"
@@ -3987,11 +3985,9 @@ if InputService.TouchEnabled then
     BindMobileButtonAction(LockBtn, LockOuter, function()
         IsUnlocked = not IsUnlocked
         LockBtn.Text = IsUnlocked and "Lock UI" or "Unlock UI"
-        -- Цвет кнопки всегда белый (не меняется)
         LockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     end)
 
-    -- ===== РЕСАЙЗ-ХЕНДЛ (полупрозрачный круг) =====
     local ResizeHandle = Library:Create('Frame', {
         Name = "ResizeHandle",
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
