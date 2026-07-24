@@ -3357,6 +3357,71 @@ function Library:CreateWindow(...)
     Library:AddToRegistry(CornerCircle, {
         BackgroundColor3 = 'AccentColor';
     });
+
+    local ResizeWireframe = nil;
+    local ResizeStartPos = nil;
+    local ResizeStartSize = nil;
+    local IsResizing = false;
+
+    local function UpdateResizeWireframe(delta)
+        if not ResizeWireframe then
+            ResizeWireframe = Library:Create("Frame", {
+                Size = Outer.Size,
+                Position = Outer.Position,
+                AnchorPoint = Outer.AnchorPoint,
+                BackgroundTransparency = 1,
+                Active = false,
+                ZIndex = 100000,
+                Parent = ScreenGui,
+            });
+            local stroke = Library:Create("UIStroke", {
+                Color = Library.AccentColor,
+                Thickness = 1,
+                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+                Parent = ResizeWireframe,
+            });
+            Library:AddToRegistry(stroke, { Color = 'AccentColor' });
+        end
+
+        local newSize = UDim2.new(
+            ResizeStartSize.X.Scale,
+            math.max(200, ResizeStartSize.X.Offset + delta.X),
+            ResizeStartSize.Y.Scale,
+            math.max(150, ResizeStartSize.Y.Offset + delta.Y)
+        );
+        ResizeWireframe.Size = newSize;
+        ResizeWireframe.Position = Outer.Position;
+    end
+
+    CornerCircle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if not Library.Toggled then return end
+            IsResizing = true;
+            ResizeStartPos = input.Position;
+            ResizeStartSize = Outer.Size;
+            UpdateResizeWireframe(Vector2.new(0, 0));
+        end
+    end);
+
+    InputService.InputChanged:Connect(function(input)
+        if IsResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input == CornerCircle.InputBegan) then
+            local delta = input.Position - ResizeStartPos;
+            UpdateResizeWireframe(delta);
+        end
+    end);
+
+    InputService.InputEnded:Connect(function(input)
+        if IsResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            IsResizing = false;
+            if ResizeWireframe then
+                Outer.Size = ResizeWireframe.Size;
+                ResizeWireframe:Destroy();
+                ResizeWireframe = nil;
+                Library:AttemptSave();
+            end
+        end
+    end);
+
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
     end;
@@ -3753,8 +3818,6 @@ function Library:CreateWindow(...)
         return Tab;
     end;
 
-    Library.ActiveWindow = Outer;
-
     local ModalElement = Library:Create('TextButton', {
         BackgroundTransparency = 1;
         Size = UDim2.new(0, 0, 0, 0);
@@ -3986,92 +4049,6 @@ if InputService.TouchEnabled then
         IsUnlocked = not IsUnlocked
         LockBtn.Text = IsUnlocked and "Lock UI" or "Unlock UI"
         LockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    end)
-
-    local ResizeHandle = Library:Create('Frame', {
-        Name = "ResizeHandle",
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 0.5,
-        Position = UDim2.new(0, 10, 1, -40),
-        Size = UDim2.new(0, 30, 0, 30),
-        ZIndex = 300,
-        Parent = MobileGui,
-        Active = true,
-    })
-    Library:Create('UICorner', { CornerRadius = UDim.new(1, 0), Parent = ResizeHandle })
-    Library:Create('UIStroke', {
-        Color = Library.AccentColor,
-        Thickness = 1,
-        Parent = ResizeHandle,
-    })
-
-    local ResizeWireframe = nil
-    local ResizeStartPos = nil
-    local ResizeStartSize = nil
-    local IsResizing = false
-
-    local function UpdateResizeWireframe(delta)
-        local win = Library.ActiveWindow
-        if not win then return end
-
-        if not ResizeWireframe then
-            ResizeWireframe = Library:Create("Frame", {
-                Size = win.Size,
-                Position = win.Position,
-                AnchorPoint = win.AnchorPoint,
-                BackgroundTransparency = 1,
-                Active = false,
-                ZIndex = 100000,
-                Parent = ScreenGui,
-            })
-            local stroke = Library:Create("UIStroke", {
-                Color = Library.AccentColor,
-                Thickness = 1,
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-                Parent = ResizeWireframe,
-            })
-            Library:AddToRegistry(stroke, { Color = 'AccentColor' })
-        end
-
-        local newSize = UDim2.new(
-            ResizeStartSize.X.Scale,
-            math.max(200, ResizeStartSize.X.Offset + delta.X),
-            ResizeStartSize.Y.Scale,
-            math.max(150, ResizeStartSize.Y.Offset + delta.Y)
-        )
-        ResizeWireframe.Size = newSize
-        ResizeWireframe.Position = win.Position
-    end
-
-    ResizeHandle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            local win = Library.ActiveWindow
-            if not win or not Library.Toggled then return end
-            IsResizing = true
-            ResizeStartPos = input.Position
-            ResizeStartSize = win.Size
-            UpdateResizeWireframe(Vector2.new(0, 0))
-        end
-    end)
-
-    InputService.InputChanged:Connect(function(input)
-        if IsResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input == ResizeHandle.InputBegan) then
-            local delta = input.Position - ResizeStartPos
-            UpdateResizeWireframe(delta)
-        end
-    end)
-
-    InputService.InputEnded:Connect(function(input)
-        if IsResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            IsResizing = false
-            local win = Library.ActiveWindow
-            if ResizeWireframe and win then
-                win.Size = ResizeWireframe.Size
-                ResizeWireframe:Destroy()
-                ResizeWireframe = nil
-                Library:AttemptSave()
-            end
-        end
     end)
 
     local _origUpdate = Library.UpdateColorsUsingRegistry
