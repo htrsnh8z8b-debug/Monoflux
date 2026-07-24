@@ -2870,7 +2870,7 @@ do
     end;
 end;
 
--- Notification system with bottom alignment
+-- Notification system - появляются сверху, уходят вниз
 do
     Library.NotificationArea = Library:Create('Frame', {
         BackgroundTransparency = 1;
@@ -2883,7 +2883,7 @@ do
         Padding = UDim.new(0, 4);
         FillDirection = Enum.FillDirection.Vertical;
         SortOrder = Enum.SortOrder.LayoutOrder;
-        VerticalAlignment = Enum.VerticalAlignment.Bottom;
+        VerticalAlignment = Enum.VerticalAlignment.Top;
         Parent = Library.NotificationArea;
     });
     local function Library_UpdateNotifAlignment()
