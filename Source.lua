@@ -2869,6 +2869,8 @@ do
         return Funcs[Key](...);
     end;
 end;
+
+-- Notification system with bottom alignment
 do
     Library.NotificationArea = Library:Create('Frame', {
         BackgroundTransparency = 1;
@@ -2881,6 +2883,7 @@ do
         Padding = UDim.new(0, 4);
         FillDirection = Enum.FillDirection.Vertical;
         SortOrder = Enum.SortOrder.LayoutOrder;
+        VerticalAlignment = Enum.VerticalAlignment.Bottom;
         Parent = Library.NotificationArea;
     });
     local function Library_UpdateNotifAlignment()
@@ -2906,277 +2909,129 @@ do
     Library.UpdateNotifAlignment = Library_UpdateNotifAlignment
     Library_UpdateNotifAlignment()
 
-    local WatermarkOuter = Library:Create('Frame', {
-        BorderColor3 = Color3.new(0, 0, 0);
-        Position = UDim2.new(0, 100, 0, -25);
-        Size = UDim2.new(0, 213, 0, 20);
-        ZIndex = 200;
-        Visible = false;
-        Parent = ScreenGui;
-    });
+    function Library:Notify(Text, Time)
+        local cfg     = Library.NotifyConfig
+        local barSide = cfg.BarSide   or 'Left'    
+        local align   = cfg.Alignment or 'Left'    
 
-    local WatermarkInner = Library:Create('Frame', {
-        BackgroundColor3 = Library.MainColor;
-        BorderColor3 = Library.AccentColor;
-        BorderMode = Enum.BorderMode.Inset;
-        Size = UDim2.new(1, 0, 1, 0);
-        ZIndex = 201;
-        Parent = WatermarkOuter;
-    });
-    Library:AddToRegistry(WatermarkInner, {
-        BorderColor3 = 'AccentColor';
-    });
-    local InnerFrame = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
-        BorderSizePixel = 0;
-        Position = UDim2.new(0, 1, 0, 1);
-        Size = UDim2.new(1, -2, 1, -2);
-        ZIndex = 202;
-        Parent = WatermarkInner;
-    });
-    local Gradient = Library:Create('UIGradient', {
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
-            ColorSequenceKeypoint.new(1, Library.MainColor),
+        local XSize, YSize = Library:GetTextBounds(Text, Library.Font, Library.FontSize)
+        YSize = YSize + 7
+
+        local BAR_THIN  = 3   
+        local BAR_THICK = 3   
+
+        local innerPosX  = (barSide == 'Left')   and 1 or 1
+        local innerPosY  = (barSide == 'Top')    and BAR_THICK or 1
+        local innerSizeW = (barSide == 'Left' or barSide == 'Right') and -2 or -2
+        local innerSizeH = (barSide == 'Top' or barSide == 'Bottom') and -(BAR_THICK + 1) or -2
+
+        local labelPosX  = (barSide == 'Left')  and BAR_THIN + 2 or 4
+        local labelSizeW = (barSide == 'Left' or barSide == 'Right') and -(BAR_THIN + 4) or -4
+
+        local outerAnchor = Vector2.new(0, 0)
+        if align == 'Center' then
+            outerAnchor = Vector2.new(0.5, 0)
+        elseif align == 'Right' then
+            outerAnchor = Vector2.new(1, 0)
+        end
+
+        local childrenCount = #Library.NotificationArea:GetChildren()
+
+        local NotifyOuter = Library:Create('Frame', {
+            BackgroundTransparency = 1;
+            AnchorPoint = outerAnchor;
+            BorderColor3 = Color3.new(0, 0, 0);
+            LayoutOrder = childrenCount + 1;
+            Size = UDim2.new(0, 0, 0, YSize);
+            ClipsDescendants = true;
+            ZIndex = 100;
+            Parent = Library.NotificationArea;
         });
-        Rotation = -90;
-        Parent = InnerFrame;
-    });
-    Library:AddToRegistry(Gradient, {
-        Color = function()
-            return ColorSequence.new({
+        local NotifyInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.MainColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 101;
+            Parent = NotifyOuter;
+        });
+        Library:AddToRegistry(NotifyInner, {
+            BackgroundColor3 = 'MainColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        local InnerFrame = Library:Create('Frame', {
+            BackgroundColor3 = Color3.new(1, 1, 1);
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, innerPosX, 0, innerPosY);
+            Size     = UDim2.new(1, innerSizeW, 1, innerSizeH);
+            ZIndex = 102;
+            Parent = NotifyInner;
+        });
+        local Gradient = Library:Create('UIGradient', {
+            Color = ColorSequence.new({
                 ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
                 ColorSequenceKeypoint.new(1, Library.MainColor),
             });
-        end
-    });
-    local WatermarkLabel = Library:CreateLabel({
-        Position = UDim2.new(0, 5, 0, 0);
-        Size = UDim2.new(1, -4, 1, 0);
-        TextSize = Library.FontSize;
-        TextXAlignment = Enum.TextXAlignment.Left;
-        ZIndex = 203;
-        Parent = InnerFrame;
-    });
-    Library.Watermark = WatermarkOuter;
-    Library.WatermarkText = WatermarkLabel;
-    Library:MakeDraggable(Library.Watermark);
-
-    local KeybindOuter = Library:Create('Frame', {
-        AnchorPoint = Vector2.new(0, 0.5);
-        BorderColor3 = Color3.new(0, 0, 0);
-        Position = UDim2.new(0, 10, 0.5, 0);
-        Size = UDim2.new(0, 210, 0, 20);
-        Visible = false;
-        ZIndex = 100;
-        Parent = ScreenGui;
-    });
-    Library:ApplyGlow(KeybindOuter);
-
-    local KeybindInner = Library:Create('Frame', {
-        BackgroundColor3 = Library.MainColor;
-        BorderColor3 = Library.OutlineColor;
-        BorderMode = Enum.BorderMode.Inset;
-        Size = UDim2.new(1, 0, 1, 0);
-        ZIndex = 101;
-        Parent = KeybindOuter;
-    });
-    Library:AddToRegistry(KeybindInner, {
-        BackgroundColor3 = 'MainColor';
-        BorderColor3 = 'OutlineColor';
-    }, true);
-    local ColorFrame = Library:Create('Frame', {
-        BackgroundColor3 = Library.AccentColor;
-        BorderSizePixel = 0;
-        Size = UDim2.new(1, 0, 0, 2);
-        ZIndex = 102;
-        Parent = KeybindInner;
-    });
-    Library:AddToRegistry(ColorFrame, {
-        BackgroundColor3 = 'AccentColor';
-    }, true);
-    local KeybindLabel = Library:CreateLabel({
-        Size = UDim2.new(1, 0, 0, 20);
-        Position = UDim2.fromOffset(5, 2),
-        TextXAlignment = Enum.TextXAlignment.Left,
-
-        Text = 'Keybinds';
-        ZIndex = 104;
-        Parent = KeybindInner;
-    });
-    local KeybindContainer = Library:Create('Frame', {
-        BackgroundTransparency = 1;
-        Size = UDim2.new(1, 0, 1, -20);
-        Position = UDim2.new(0, 0, 0, 20);
-        ZIndex = 1;
-        Parent = KeybindInner;
-    });
-    Library:Create('UIListLayout', {
-        FillDirection = Enum.FillDirection.Vertical;
-        SortOrder = Enum.SortOrder.LayoutOrder;
-        Parent = KeybindContainer;
-    });
-    Library:Create('UIPadding', {
-        PaddingLeft = UDim.new(0, 5),
-        Parent = KeybindContainer,
-    })
-
-    Library.KeybindFrame = KeybindOuter;
-    Library.KeybindContainer = KeybindContainer;
-    Library:MakeDraggable(KeybindOuter);
-end;
-
-function Library:SetKeybindMode(Mode)
-    assert(Mode == 'All' or Mode == 'Active' or Mode == 'Toggled',
-        "SetKeybindMode: Mode must be 'All', 'Active', or 'Toggled'")
-    Library.KeybindMode = Mode
-    Library:RefreshKeybinds()
-end
-
-function Library:RefreshKeybinds()
-    for _, kp in ipairs(Library.KeyPickerList) do
-        if not kp.NoUI then
-            pcall(function() kp:Update() end)
-        end
-    end
-end
-
-function Library:SetWatermarkVisibility(Bool)
-    Library.Watermark.Visible = Bool;
-end;
-
-function Library:SetWatermark(Text)
-    local X, Y = Library:GetTextBounds(Text, Library.Font, Library.FontSize);
-    Library.Watermark.Size = UDim2.new(0, X + 15, 0, (Y * 1.5) + 3);
-    Library:SetWatermarkVisibility(true)
-
-    Library.WatermarkText.Text = Text;
-end;
-function Library:Notify(Text, Time)
-    local cfg     = Library.NotifyConfig
-    local barSide = cfg.BarSide   or 'Left'    
-    local align   = cfg.Alignment or 'Left'    
-
-    local XSize, YSize = Library:GetTextBounds(Text, Library.Font, Library.FontSize)
-    YSize = YSize + 7
-
-    local BAR_THIN  = 3   
-    local BAR_THICK = 3   
-
-    local innerPosX  = (barSide == 'Left')   and 1 or 1
-    local innerPosY  = (barSide == 'Top')    and BAR_THICK or 1
-    local innerSizeW = (barSide == 'Left' or barSide == 'Right') and -2 or -2
-    local innerSizeH = (barSide == 'Top' or barSide == 'Bottom') and -(BAR_THICK + 1) or -2
-
-    local labelPosX  = (barSide == 'Left')  and BAR_THIN + 2 or 4
-    local labelSizeW = (barSide == 'Left' or barSide == 'Right') and -(BAR_THIN + 4) or -4
-
-    local outerAnchor = Vector2.new(0, 0)
-    local outerPosX   = 0
-    if align == 'Center' then
-        outerAnchor = Vector2.new(0.5, 0)
-        outerPosX   = 0  
-    elseif align == 'Right' then
-        outerAnchor = Vector2.new(1, 0)
-        outerPosX   = 0
-    end
-
-    local NotifyOuter = Library:Create('Frame', {
-        BackgroundTransparency = 1;
-        AnchorPoint = outerAnchor;
-        BorderColor3 = Color3.new(0, 0, 0);
-        Position     = (align == 'Center')
-            and UDim2.new(0.5, 0, 0, 0)
-            or  (align == 'Right' and UDim2.new(1, 0, 0, 0) or UDim2.new(0, 0, 0, 0));
-        Size = UDim2.new(0, 0, 0, YSize);
-        ClipsDescendants = true;
-        ZIndex = 100;
-        Parent = Library.NotificationArea;
-    });
-    local NotifyInner = Library:Create('Frame', {
-        BackgroundColor3 = Library.MainColor;
-        BorderColor3 = Library.OutlineColor;
-        BorderMode = Enum.BorderMode.Inset;
-        Size = UDim2.new(1, 0, 1, 0);
-        ZIndex = 101;
-        Parent = NotifyOuter;
-    });
-    Library:AddToRegistry(NotifyInner, {
-        BackgroundColor3 = 'MainColor';
-        BorderColor3 = 'OutlineColor';
-    }, true);
-    local InnerFrame = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
-        BorderSizePixel = 0;
-        Position = UDim2.new(0, innerPosX, 0, innerPosY);
-        Size     = UDim2.new(1, innerSizeW, 1, innerSizeH);
-        ZIndex = 102;
-        Parent = NotifyInner;
-    });
-    local Gradient = Library:Create('UIGradient', {
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
-            ColorSequenceKeypoint.new(1, Library.MainColor),
+            Rotation = -90;
+            Parent = InnerFrame;
         });
-        Rotation = -90;
-        Parent = InnerFrame;
-    });
-    Library:AddToRegistry(Gradient, {
-        Color = function()
-            return ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
-                ColorSequenceKeypoint.new(1, Library.MainColor),
-            });
+        Library:AddToRegistry(Gradient, {
+            Color = function()
+                return ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
+                    ColorSequenceKeypoint.new(1, Library.MainColor),
+                });
+            end
+        });
+        local NotifyLabel = Library:CreateLabel({
+            Position = UDim2.new(0, labelPosX, 0, 0);
+            Size     = UDim2.new(1, labelSizeW, 1, 0);
+            Text     = Text;
+            TextXAlignment = (align == 'Center')
+                and Enum.TextXAlignment.Center
+                or  Enum.TextXAlignment.Left;
+            TextSize = Library.FontSize;
+            ZIndex   = 103;
+            Parent   = InnerFrame;
+        });
+        local AccentBar = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel  = 0;
+            ZIndex           = 104;
+            Parent           = NotifyOuter;
+        });
+        if barSide == 'Left' then
+            AccentBar.Position = UDim2.new(0, -1, 0, -1)
+            AccentBar.Size     = UDim2.new(0, BAR_THIN, 1, 2)
+        elseif barSide == 'Right' then
+            AccentBar.Position = UDim2.new(1, -BAR_THIN + 1, 0, -1)
+            AccentBar.Size     = UDim2.new(0, BAR_THIN, 1, 2)
+        elseif barSide == 'Top' then
+            AccentBar.Position = UDim2.new(0, -1, 0, -1)
+            AccentBar.Size     = UDim2.new(1, 2, 0, BAR_THICK)
+        elseif barSide == 'Bottom' then
+            AccentBar.Position = UDim2.new(0, -1, 1, -BAR_THICK + 1)
+            AccentBar.Size     = UDim2.new(1, 2, 0, BAR_THICK)
         end
-    });
-    local NotifyLabel = Library:CreateLabel({
-        Position = UDim2.new(0, labelPosX, 0, 0);
-        Size     = UDim2.new(1, labelSizeW, 1, 0);
-        Text     = Text;
-        TextXAlignment = (align == 'Center')
-            and Enum.TextXAlignment.Center
-            or  Enum.TextXAlignment.Left;
-        TextSize = Library.FontSize;
-        ZIndex   = 103;
-        Parent   = InnerFrame;
-    });
-    local AccentBar = Library:Create('Frame', {
-        BackgroundColor3 = Library.AccentColor;
-        BorderSizePixel  = 0;
-        ZIndex           = 104;
-        Parent           = NotifyOuter;
-    });
-    if barSide == 'Left' then
-        AccentBar.Position = UDim2.new(0, -1, 0, -1)
-        AccentBar.Size     = UDim2.new(0, BAR_THIN, 1, 2)
-    elseif barSide == 'Right' then
-        AccentBar.Position = UDim2.new(1, -BAR_THIN + 1, 0, -1)
-        AccentBar.Size     = UDim2.new(0, BAR_THIN, 1, 2)
-    elseif barSide == 'Top' then
-        AccentBar.Position = UDim2.new(0, -1, 0, -1)
-        AccentBar.Size     = UDim2.new(1, 2, 0, BAR_THICK)
-    elseif barSide == 'Bottom' then
-        AccentBar.Position = UDim2.new(0, -1, 1, -BAR_THICK + 1)
-        AccentBar.Size     = UDim2.new(1, 2, 0, BAR_THICK)
-    end
 
-    Library:AddToRegistry(AccentBar, {
-        BackgroundColor3 = 'AccentColor';
-    }, true);
-    local finalWidth = XSize + 8 + 4
-    if barSide == 'Left' or barSide == 'Right' then
-        finalWidth = finalWidth + BAR_THIN
-    end
-    pcall(NotifyOuter.TweenSize, NotifyOuter,
-        UDim2.new(0, finalWidth, 0, YSize), 'Out', 'Quad', 0.4, true);
-    task.spawn(function()
-        wait(Time or 5);
+        Library:AddToRegistry(AccentBar, {
+            BackgroundColor3 = 'AccentColor';
+        }, true);
+        local finalWidth = XSize + 8 + 4
+        if barSide == 'Left' or barSide == 'Right' then
+            finalWidth = finalWidth + BAR_THIN
+        end
         pcall(NotifyOuter.TweenSize, NotifyOuter,
-            UDim2.new(0, 0, 0, YSize), 'Out', 'Quad', 0.4, true);
-        wait(0.4);
-        NotifyOuter:Destroy();
-    end);
-end;
+            UDim2.new(0, finalWidth, 0, YSize), 'Out', 'Quad', 0.4, true);
+        task.spawn(function()
+            wait(Time or 5);
+            pcall(NotifyOuter.TweenSize, NotifyOuter,
+                UDim2.new(0, 0, 0, YSize), 'Out', 'Quad', 0.4, true);
+            wait(0.4);
+            NotifyOuter:Destroy();
+        end);
+    end
+end
 
 function Library:CreateWindow(...)
     local Arguments = { ... }
