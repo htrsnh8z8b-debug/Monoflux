@@ -46,6 +46,9 @@ local Library = {
     ScreenGui = ScreenGui;
 };
 
+-- Заглушка для Toggle, чтобы избежать ошибок при вызове до создания окна
+Library.Toggle = function() end
+
 local RainbowStep = 0
 local Hue = 0
 
@@ -990,7 +993,7 @@ do
         local KeyPicker = {
             Value = Info.Default;
             Toggled = false;
-            Mode = Info.Mode or 'Toggle'; -- Always, Toggle, Hold
+            Mode = Info.Mode or 'Toggle';
             Type = 'KeyPicker';
             Callback = Info.Callback or function(Value) end;
             ChangedCallback = Info.ChangedCallback or function(New) end;
@@ -3475,7 +3478,8 @@ function Library:CreateWindow(...)
     local Toggled = false;
     local Fading = false;
 
-    function Library:Toggle()
+    -- Переопределяем Library.Toggle полноценной реализацией
+    Library.Toggle = function()
         if Fading then
             return;
         end;
