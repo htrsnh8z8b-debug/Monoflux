@@ -64,31 +64,6 @@ local Library = {
 
 _G.UIUnlocked = false;
 
--- ===== ДОБАВЛЕНО: контейнеры для отображения активных биндов =====
-Library.KeybindContainer = Library:Create('Frame', {
-    BackgroundTransparency = 1,
-    Size = UDim2.new(1, 0, 1, 0),
-    ZIndex = 100,
-    Parent = ScreenGui,
-    Visible = true,
-})
-Library.KeybindFrame = Library:Create('Frame', {
-    BackgroundColor3 = Library.BackgroundColor,
-    BorderColor3 = Library.OutlineColor,
-    BorderMode = Enum.BorderMode.Inset,
-    Position = UDim2.new(0, 10, 0, 10),
-    Size = UDim2.new(0, 210, 0, 0),
-    ZIndex = 100,
-    Parent = ScreenGui,
-    Visible = false,
-    Active = true,
-})
-Library:AddToRegistry(Library.KeybindFrame, {
-    BackgroundColor3 = 'BackgroundColor',
-    BorderColor3 = 'OutlineColor',
-})
--- ============================================================
-
 Library.KeyPickerList = {};
 
 Library.BlurEffect = Instance.new("BlurEffect")
