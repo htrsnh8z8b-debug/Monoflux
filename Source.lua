@@ -1,4 +1,3 @@
-local InputService = game:GetService('UserInputService');
 local TextService = game:GetService('TextService');
 local CoreGui = game:GetService('CoreGui');
 local Teams = game:GetService('Teams');
@@ -64,56 +63,7 @@ local Library = {
 
 _G.UIUnlocked = false;
 
--- =====================================================
--- СОЗДАЁМ КОМПОНЕНТЫ ДЛЯ KEYPICKER (ПОСЛЕ ОБЪЯВЛЕНИЯ Library)
--- =====================================================
 Library.KeyPickerList = {};
-
-Library.KeybindContainer = Library:Create('Frame', {
-    Name = 'KeybindContainer',
-    BackgroundTransparency = 1,
-    Size = UDim2.new(1, 0, 1, 0),
-    ZIndex = 110,
-    Parent = Library.ScreenGui,
-});
-
-Library.KeybindFrame = Library:Create('Frame', {
-    Name = 'KeybindFrame',
-    BackgroundColor3 = Library.MainColor,
-    BorderColor3 = Library.OutlineColor,
-    BorderMode = Enum.BorderMode.Inset,
-    Position = UDim2.new(0, 10, 0, 10),
-    Size = UDim2.new(0, 210, 0, 100),
-    Visible = false,
-    ZIndex = 100,
-    Parent = Library.ScreenGui,
-});
-Library:AddToRegistry(Library.KeybindFrame, {
-    BackgroundColor3 = 'MainColor',
-    BorderColor3 = 'OutlineColor',
-});
-
-local inner = Library:Create('Frame', {
-    Name = 'Inner',
-    BackgroundColor3 = Library.BackgroundColor,
-    BorderSizePixel = 0,
-    Size = UDim2.new(1, 0, 1, 0),
-    ZIndex = 101,
-    Parent = Library.KeybindFrame,
-});
-Library:AddToRegistry(inner, { BackgroundColor3 = 'BackgroundColor' });
-
-Library.KeybindContainer.Parent = inner;
-
-Library:Create('UIListLayout', {
-    FillDirection = Enum.FillDirection.Vertical,
-    SortOrder = Enum.SortOrder.LayoutOrder,
-    Padding = UDim.new(0, 2),
-    Parent = Library.KeybindContainer,
-});
-
-Library.KeybindMode = 'All';
--- =====================================================
 
 Library.BlurEffect = Instance.new("BlurEffect")
 Library.BlurEffect.Name = "LinoriaBlur"
