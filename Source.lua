@@ -2871,7 +2871,9 @@ do
     end;
 end;
 
--- Notification system (улучшенный: появляются сверху, уходят вниз)
+-- ================================================================
+--  Notification system (основные уведомления, без изменений)
+-- ================================================================
 do
     Library.NotificationArea = Library:Create('Frame', {
         BackgroundTransparency = 1;
@@ -2942,7 +2944,7 @@ do
             BackgroundTransparency = 1;
             AnchorPoint = outerAnchor;
             BorderColor3 = Color3.new(0, 0, 0);
-            LayoutOrder = childrenCount + 1; -- новые уведомления добавляются снизу
+            LayoutOrder = childrenCount + 1;
             Size = UDim2.new(0, 0, 0, YSize);
             ClipsDescendants = true;
             ZIndex = 100;
@@ -3034,7 +3036,273 @@ do
     end
 end
 
--- Watermark and Keybinds (оставляем как в первом скрипте)
+-- ================================================================
+--  КАСТОМНЫЕ УВЕДОМЛЕНИЯ (независимые от основных)
+-- ================================================================
+do
+    -- контейнер для кастомных уведомлений (создаётся при первом вызове)
+    Library._customNotifyContainer = nil
+
+    local function ensureContainer()
+        if not Library._customNotifyContainer then
+            Library._customNotifyContainer = Library:Create('Frame', {
+                Name = 'CustomNotifyContainer',
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 1, 0),
+                ZIndex = 200, -- поверх большинства элементов
+                Parent = ScreenGui,
+            })
+            -- чтобы не мешать кликам
+            Library._customNotifyContainer.Active = false
+            Library._customNotifyContainer.Selectable = false
+            Library._customNotifyContainer.BackgroundTransparency = 1
+        end
+        return Library._customNotifyContainer
+    end
+
+    -- вспомогательная функция для получения UDim2 позиции по строке
+    local function getPositionFromString(posStr)
+        if type(posStr) == "UDim2" then
+            return posStr
+        end
+        local anchor = Vector2.new(0, 0)
+        local xScale = 0
+        local yScale = 0
+        local xOffset = 20
+        local yOffset = 20
+
+        if posStr == "top-left" then
+            anchor = Vector2.new(0, 0)
+            xScale = 0
+            yScale = 0
+        elseif posStr == "top-right" then
+            anchor = Vector2.new(1, 0)
+            xScale = 1
+            yScale = 0
+            xOffset = -20
+        elseif posStr == "bottom-left" then
+            anchor = Vector2.new(0, 1)
+            xScale = 0
+            yScale = 1
+            yOffset = -20
+        elseif posStr == "bottom-right" then
+            anchor = Vector2.new(1, 1)
+            xScale = 1
+            yScale = 1
+            xOffset = -20
+            yOffset = -20
+        elseif posStr == "center" then
+            anchor = Vector2.new(0.5, 0.5)
+            xScale = 0.5
+            yScale = 0.5
+            xOffset = 0
+            yOffset = 0
+        else
+            -- по умолчанию top-left
+            anchor = Vector2.new(0, 0)
+            xScale = 0
+            yScale = 0
+        end
+        return UDim2.new(xScale, xOffset, yScale, yOffset), anchor
+    end
+
+    function Library:CustomNotify(params)
+        assert(params.Text, "CustomNotify: missing 'Text' field")
+        local text = params.Text
+        local duration = params.Duration or 3
+        local color = params.Color or Library.AccentColor
+        local icon = params.Icon
+        local position = params.Position or "top-right"
+        local animIn = params.AnimationIn or "fade"
+        local animOut = params.AnimationOut or "fade"
+        local onShow = params.OnShow
+        local onHide = params.OnHide
+
+        local container = ensureContainer()
+
+        -- определяем позицию
+        local posUDim, anchor = getPositionFromString(position)
+
+        -- создаём уведомление
+        local XSize, YSize = Library:GetTextBounds(text, Library.Font, Library.FontSize)
+        local padding = 12
+        local width = XSize + padding * 2
+        local height = YSize + padding * 2
+        if icon then
+            width = width + 20 + 4 -- иконка + отступ
+        end
+
+        local notify = Library:Create('Frame', {
+            BackgroundColor3 = Library.MainColor,
+            BorderColor3 = Library.OutlineColor,
+            BorderMode = Enum.BorderMode.Inset,
+            Size = UDim2.new(0, width, 0, height),
+            Position = posUDim,
+            AnchorPoint = anchor,
+            ZIndex = 201,
+            Parent = container,
+            ClipsDescendants = true,
+            Visible = true,
+            BackgroundTransparency = 1, -- для анимации появления
+        })
+        Library:AddToRegistry(notify, {
+            BackgroundColor3 = 'MainColor',
+            BorderColor3 = 'OutlineColor',
+        })
+
+        -- акцентная полоска
+        local accent = Library:Create('Frame', {
+            BackgroundColor3 = color,
+            BorderSizePixel = 0,
+            Size = UDim2.new(0, 3, 1, 0),
+            Position = UDim2.new(0, 0, 0, 0),
+            ZIndex = 202,
+            Parent = notify,
+        })
+        Library:AddToRegistry(accent, { BackgroundColor3 = color })
+
+        -- внутренняя обёртка
+        local inner = Library:Create('Frame', {
+            BackgroundColor3 = Color3.fromRGB(8, 8, 12),
+            BorderSizePixel = 0,
+            Position = UDim2.new(0, 3, 0, 0),
+            Size = UDim2.new(1, -3, 1, 0),
+            ZIndex = 203,
+            Parent = notify,
+        })
+
+        -- иконка (если есть)
+        local iconLabel = nil
+        if icon then
+            iconLabel = Library:Create('ImageLabel', {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(0, 16, 0, 16),
+                Position = UDim2.new(0, 6, 0.5, -8),
+                Image = icon,
+                ZIndex = 204,
+                Parent = inner,
+            })
+        end
+
+        -- текст
+        local label = Library:CreateLabel({
+            Position = UDim2.new(icon and 0.4 or 0, icon and 2 or 6, 0.5, -YSize/2),
+            Size = UDim2.new(1, -(icon and 26 or 12), 1, 0),
+            Text = text,
+            TextSize = Library.FontSize,
+            TextXAlignment = icon and Enum.TextXAlignment.Left or Enum.TextXAlignment.Center,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            ZIndex = 204,
+            Parent = inner,
+        })
+
+        -- функция закрытия
+        local function close()
+            if not notify or not notify.Parent then return end
+            -- анимация исчезновения
+            if animOut == "fade" then
+                local tween = TweenService:Create(notify, TweenInfo.new(0.3, Enum.EasingStyle.Linear), { BackgroundTransparency = 1 })
+                tween:Play()
+                tween.Completed:Wait()
+            elseif animOut == "slide" then
+                local dir = Vector2.new(0, 0)
+                -- определяем направление слайда в зависимости от позиции
+                local _, anch = getPositionFromString(position)
+                if anch.X == 0 and anch.Y == 0 then
+                    dir = Vector2.new(-1, 0) -- влево
+                elseif anch.X == 1 and anch.Y == 0 then
+                    dir = Vector2.new(1, 0) -- вправо
+                elseif anch.X == 0 and anch.Y == 1 then
+                    dir = Vector2.new(0, 1) -- вниз
+                elseif anch.X == 1 and anch.Y == 1 then
+                    dir = Vector2.new(0, -1) -- вверх
+                else
+                    dir = Vector2.new(0, -1) -- по умолчанию вверх
+                end
+                local offset = 50
+                local tween = TweenService:Create(notify, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                    Position = UDim2.new(
+                        notify.Position.X.Scale,
+                        notify.Position.X.Offset + dir.X * offset,
+                        notify.Position.Y.Scale,
+                        notify.Position.Y.Offset + dir.Y * offset
+                    ),
+                    BackgroundTransparency = 1
+                })
+                tween:Play()
+                tween.Completed:Wait()
+            else
+                -- по умолчанию fade
+                local tween = TweenService:Create(notify, TweenInfo.new(0.3, Enum.EasingStyle.Linear), { BackgroundTransparency = 1 })
+                tween:Play()
+                tween.Completed:Wait()
+            end
+            notify:Destroy()
+            if onHide then onHide() end
+        end
+
+        -- анимация появления
+        if animIn == "fade" then
+            notify.BackgroundTransparency = 1
+            local tween = TweenService:Create(notify, TweenInfo.new(0.3, Enum.EasingStyle.Linear), { BackgroundTransparency = 0 })
+            tween:Play()
+            tween.Completed:Wait()
+        elseif animIn == "slide" then
+            local dir = Vector2.new(0, 0)
+            local _, anch = getPositionFromString(position)
+            if anch.X == 0 and anch.Y == 0 then
+                dir = Vector2.new(-1, 0)
+            elseif anch.X == 1 and anch.Y == 0 then
+                dir = Vector2.new(1, 0)
+            elseif anch.X == 0 and anch.Y == 1 then
+                dir = Vector2.new(0, 1)
+            elseif anch.X == 1 and anch.Y == 1 then
+                dir = Vector2.new(0, -1)
+            else
+                dir = Vector2.new(0, -1)
+            end
+            local offset = 50
+            notify.Position = UDim2.new(
+                notify.Position.X.Scale,
+                notify.Position.X.Offset - dir.X * offset,
+                notify.Position.Y.Scale,
+                notify.Position.Y.Offset - dir.Y * offset
+            )
+            notify.BackgroundTransparency = 1
+            local tween = TweenService:Create(notify, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Position = UDim2.new(
+                    notify.Position.X.Scale,
+                    notify.Position.X.Offset + dir.X * offset,
+                    notify.Position.Y.Scale,
+                    notify.Position.Y.Offset + dir.Y * offset
+                ),
+                BackgroundTransparency = 0
+            })
+            tween:Play()
+            tween.Completed:Wait()
+        else
+            notify.BackgroundTransparency = 0
+        end
+
+        if onShow then onShow() end
+
+        -- таймер автозакрытия
+        task.spawn(function()
+            wait(duration)
+            close()
+        end)
+
+        -- возвращаем объект для ручного управления (можно закрыть раньше)
+        return {
+            Close = close,
+            Object = notify,
+        }
+    end
+end
+
+-- ================================================================
+--  Watermark and Keybinds (оставляем как в первом скрипте)
+-- ================================================================
 do
     local WatermarkOuter = Library:Create('Frame', {
         BorderColor3 = Color3.new(0, 0, 0);
