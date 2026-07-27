@@ -62,7 +62,7 @@ local Library = {
     };
 };
 
-_G.UIUnlocked = false;
+_G.UIUnlocked = false; -- для блокировки перемещения на мобилке
 
 Library.KeyPickerList = {};
 
@@ -231,6 +231,7 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
     Instance.Active = true;
     Instance.InputBegan:Connect(function(Input)
         if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+            -- Блокировка перемещения на мобилке, если UIUnlocked = false
             if IsWindow and InputService.TouchEnabled and not _G.UIUnlocked then
                 return
             end
@@ -2870,139 +2871,8 @@ do
     end;
 end;
 
--- ------------------------------------------------------------
--- Уведомления (основные + кастомные)
--- ------------------------------------------------------------
+-- Notification system (улучшенный: появляются сверху, уходят вниз)
 do
-    -- Общая функция создания уведомления в переданной области
-    local function CreateNotificationInArea(parent, Text, Time, config)
-        config = config or {}
-        local barSide = config.BarSide or 'Left'
-        local align = config.Alignment or 'Left'  -- выравнивание текста внутри уведомления
-        local XSize, YSize = Library:GetTextBounds(Text, Library.Font, Library.FontSize)
-        YSize = YSize + 7
-
-        local BAR_THIN  = 3
-        local BAR_THICK = 3
-
-        local innerPosX  = (barSide == 'Left')   and 1 or 1
-        local innerPosY  = (barSide == 'Top')    and BAR_THICK or 1
-        local innerSizeW = (barSide == 'Left' or barSide == 'Right') and -2 or -2
-        local innerSizeH = (barSide == 'Top' or barSide == 'Bottom') and -(BAR_THICK + 1) or -2
-
-        local labelPosX  = (barSide == 'Left')  and BAR_THIN + 2 or 4
-        local labelSizeW = (barSide == 'Left' or barSide == 'Right') and -(BAR_THIN + 4) or -4
-
-        local outerAnchor = Vector2.new(0, 0)
-        if align == 'Center' then
-            outerAnchor = Vector2.new(0.5, 0)
-        elseif align == 'Right' then
-            outerAnchor = Vector2.new(1, 0)
-        end
-
-        local childrenCount = #parent:GetChildren()
-
-        local NotifyOuter = Library:Create('Frame', {
-            BackgroundTransparency = 1;
-            AnchorPoint = outerAnchor;
-            BorderColor3 = Color3.new(0, 0, 0);
-            LayoutOrder = childrenCount + 1;
-            Size = UDim2.new(0, 0, 0, YSize);
-            ClipsDescendants = true;
-            ZIndex = 100;
-            Parent = parent;
-        });
-
-        local NotifyInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
-            BorderColor3 = Library.OutlineColor;
-            BorderMode = Enum.BorderMode.Inset;
-            Size = UDim2.new(1, 0, 1, 0);
-            ZIndex = 101;
-            Parent = NotifyOuter;
-        });
-        Library:AddToRegistry(NotifyInner, {
-            BackgroundColor3 = 'MainColor';
-            BorderColor3 = 'OutlineColor';
-        }, true);
-
-        local InnerFrame = Library:Create('Frame', {
-            BackgroundColor3 = Color3.new(1, 1, 1);
-            BorderSizePixel = 0;
-            Position = UDim2.new(0, innerPosX, 0, innerPosY);
-            Size     = UDim2.new(1, innerSizeW, 1, innerSizeH);
-            ZIndex = 102;
-            Parent = NotifyInner;
-        });
-
-        local Gradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
-                ColorSequenceKeypoint.new(1, Library.MainColor),
-            });
-            Rotation = -90;
-            Parent = InnerFrame;
-        });
-        Library:AddToRegistry(Gradient, {
-            Color = function()
-                return ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
-                    ColorSequenceKeypoint.new(1, Library.MainColor),
-                });
-            end
-        });
-
-        local NotifyLabel = Library:CreateLabel({
-            Position = UDim2.new(0, labelPosX, 0, 0);
-            Size     = UDim2.new(1, labelSizeW, 1, 0);
-            Text     = Text;
-            TextXAlignment = (align == 'Center')
-                and Enum.TextXAlignment.Center
-                or  Enum.TextXAlignment.Left;
-            TextSize = Library.FontSize;
-            ZIndex   = 103;
-            Parent   = InnerFrame;
-        });
-
-        local AccentBar = Library:Create('Frame', {
-            BackgroundColor3 = Library.AccentColor;
-            BorderSizePixel  = 0;
-            ZIndex           = 104;
-            Parent           = NotifyOuter;
-        });
-        if barSide == 'Left' then
-            AccentBar.Position = UDim2.new(0, -1, 0, -1)
-            AccentBar.Size     = UDim2.new(0, BAR_THIN, 1, 2)
-        elseif barSide == 'Right' then
-            AccentBar.Position = UDim2.new(1, -BAR_THIN + 1, 0, -1)
-            AccentBar.Size     = UDim2.new(0, BAR_THIN, 1, 2)
-        elseif barSide == 'Top' then
-            AccentBar.Position = UDim2.new(0, -1, 0, -1)
-            AccentBar.Size     = UDim2.new(1, 2, 0, BAR_THICK)
-        elseif barSide == 'Bottom' then
-            AccentBar.Position = UDim2.new(0, -1, 1, -BAR_THICK + 1)
-            AccentBar.Size     = UDim2.new(1, 2, 0, BAR_THICK)
-        end
-        Library:AddToRegistry(AccentBar, {
-            BackgroundColor3 = 'AccentColor';
-        }, true);
-
-        local finalWidth = XSize + 8 + 4
-        if barSide == 'Left' or barSide == 'Right' then
-            finalWidth = finalWidth + BAR_THIN
-        end
-        pcall(NotifyOuter.TweenSize, NotifyOuter,
-            UDim2.new(0, finalWidth, 0, YSize), 'Out', 'Quad', 0.4, true);
-        task.spawn(function()
-            wait(Time or 5);
-            pcall(NotifyOuter.TweenSize, NotifyOuter,
-                UDim2.new(0, 0, 0, YSize), 'Out', 'Quad', 0.4, true);
-            wait(0.4);
-            NotifyOuter:Destroy();
-        end);
-    end
-
-    -- Основная область (для Library:Notify)
     Library.NotificationArea = Library:Create('Frame', {
         BackgroundTransparency = 1;
         Position = UDim2.new(0, Library.NotifyConfig.PositionX, 0, Library.NotifyConfig.PositionY);
@@ -3014,7 +2884,7 @@ do
         Padding = UDim.new(0, 4);
         FillDirection = Enum.FillDirection.Vertical;
         SortOrder = Enum.SortOrder.LayoutOrder;
-        VerticalAlignment = Enum.VerticalAlignment.Top;
+        VerticalAlignment = Enum.VerticalAlignment.Top; -- уведомления сверху
         Parent = Library.NotificationArea;
     });
     local function Library_UpdateNotifAlignment()
@@ -3040,68 +2910,131 @@ do
     Library.UpdateNotifAlignment = Library_UpdateNotifAlignment
     Library_UpdateNotifAlignment()
 
-    -- Основные уведомления
     function Library:Notify(Text, Time)
-        CreateNotificationInArea(Library.NotificationArea, Text, Time, Library.NotifyConfig)
-    end
+        local cfg     = Library.NotifyConfig
+        local barSide = cfg.BarSide   or 'Left'    
+        local align   = cfg.Alignment or 'Left'    
 
-    -- Кастомные уведомления (отдельная область)
-    Library.CustomNotificationArea = nil  -- создаётся при первом вызове
+        local XSize, YSize = Library:GetTextBounds(Text, Library.Font, Library.FontSize)
+        YSize = YSize + 7
 
-    function Library:CustomNotify(Text, Time, CustomConfig)
-        CustomConfig = CustomConfig or {}
-        -- Если область ещё не создана, создаём с параметрами из CustomConfig или значениями по умолчанию
-        if not Library.CustomNotificationArea then
-            local pos = CustomConfig.Position or UDim2.fromScale(0.5, 0.9)
-            local size = CustomConfig.Size or UDim2.new(0, 300, 0, 0) -- высота будет автоматически
-            local area = Library:Create('Frame', {
-                BackgroundTransparency = 1;
-                Position = pos;
-                Size = UDim2.new(0, 300, 0, 0); -- ширина фиксирована, высота подстроится
-                ZIndex = 100;
-                Parent = ScreenGui;
-            });
-            -- AnchorPoint можно задать через CustomConfig, по умолчанию (0,0)
-            if CustomConfig.AnchorPoint then
-                area.AnchorPoint = CustomConfig.AnchorPoint
-            end
-            local layout = Library:Create('UIListLayout', {
-                Padding = UDim.new(0, 4);
-                FillDirection = Enum.FillDirection.Vertical;
-                SortOrder = Enum.SortOrder.LayoutOrder;
-                VerticalAlignment = Enum.VerticalAlignment[CustomConfig.VerticalAlignment or 'Bottom'];
-                Parent = area;
-            });
-            -- Горизонтальное выравнивание внутри области
-            local hAlign = CustomConfig.Alignment or 'Center'
-            if hAlign == 'Left' then
-                layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-            elseif hAlign == 'Right' then
-                layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-            else
-                layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-            end
-            Library.CustomNotificationArea = area
-            Library.CustomNotificationLayout = layout
-            -- Подстраиваем размер области под содержимое
-            layout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
-                area.Size = UDim2.new(0, 300, 0, layout.AbsoluteContentSize.Y + 8)
-            end)
+        local BAR_THIN  = 3   
+        local BAR_THICK = 3   
+
+        local innerPosX  = (barSide == 'Left')   and 1 or 1
+        local innerPosY  = (barSide == 'Top')    and BAR_THICK or 1
+        local innerSizeW = (barSide == 'Left' or barSide == 'Right') and -2 or -2
+        local innerSizeH = (barSide == 'Top' or barSide == 'Bottom') and -(BAR_THICK + 1) or -2
+
+        local labelPosX  = (barSide == 'Left')  and BAR_THIN + 2 or 4
+        local labelSizeW = (barSide == 'Left' or barSide == 'Right') and -(BAR_THIN + 4) or -4
+
+        local outerAnchor = Vector2.new(0, 0)
+        if align == 'Center' then
+            outerAnchor = Vector2.new(0.5, 0)
+        elseif align == 'Right' then
+            outerAnchor = Vector2.new(1, 0)
         end
 
-        -- Формируем конфиг для уведомления: берём настройки из CustomConfig, но если не заданы, используем из NotifyConfig
-        local notifyConfig = {
-            BarSide = CustomConfig.BarSide or Library.NotifyConfig.BarSide,
-            Alignment = CustomConfig.Alignment or Library.NotifyConfig.Alignment,
-        }
-        CreateNotificationInArea(Library.CustomNotificationArea, Text, Time, notifyConfig)
-    end
+        local childrenCount = #Library.NotificationArea:GetChildren()
 
+        local NotifyOuter = Library:Create('Frame', {
+            BackgroundTransparency = 1;
+            AnchorPoint = outerAnchor;
+            BorderColor3 = Color3.new(0, 0, 0);
+            LayoutOrder = childrenCount + 1; -- новые уведомления добавляются снизу
+            Size = UDim2.new(0, 0, 0, YSize);
+            ClipsDescendants = true;
+            ZIndex = 100;
+            Parent = Library.NotificationArea;
+        });
+        local NotifyInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.MainColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 101;
+            Parent = NotifyOuter;
+        });
+        Library:AddToRegistry(NotifyInner, {
+            BackgroundColor3 = 'MainColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        local InnerFrame = Library:Create('Frame', {
+            BackgroundColor3 = Color3.new(1, 1, 1);
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, innerPosX, 0, innerPosY);
+            Size     = UDim2.new(1, innerSizeW, 1, innerSizeH);
+            ZIndex = 102;
+            Parent = NotifyInner;
+        });
+        local Gradient = Library:Create('UIGradient', {
+            Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
+                ColorSequenceKeypoint.new(1, Library.MainColor),
+            });
+            Rotation = -90;
+            Parent = InnerFrame;
+        });
+        Library:AddToRegistry(Gradient, {
+            Color = function()
+                return ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
+                    ColorSequenceKeypoint.new(1, Library.MainColor),
+                });
+            end
+        });
+        local NotifyLabel = Library:CreateLabel({
+            Position = UDim2.new(0, labelPosX, 0, 0);
+            Size     = UDim2.new(1, labelSizeW, 1, 0);
+            Text     = Text;
+            TextXAlignment = (align == 'Center')
+                and Enum.TextXAlignment.Center
+                or  Enum.TextXAlignment.Left;
+            TextSize = Library.FontSize;
+            ZIndex   = 103;
+            Parent   = InnerFrame;
+        });
+        local AccentBar = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel  = 0;
+            ZIndex           = 104;
+            Parent           = NotifyOuter;
+        });
+        if barSide == 'Left' then
+            AccentBar.Position = UDim2.new(0, -1, 0, -1)
+            AccentBar.Size     = UDim2.new(0, BAR_THIN, 1, 2)
+        elseif barSide == 'Right' then
+            AccentBar.Position = UDim2.new(1, -BAR_THIN + 1, 0, -1)
+            AccentBar.Size     = UDim2.new(0, BAR_THIN, 1, 2)
+        elseif barSide == 'Top' then
+            AccentBar.Position = UDim2.new(0, -1, 0, -1)
+            AccentBar.Size     = UDim2.new(1, 2, 0, BAR_THICK)
+        elseif barSide == 'Bottom' then
+            AccentBar.Position = UDim2.new(0, -1, 1, -BAR_THICK + 1)
+            AccentBar.Size     = UDim2.new(1, 2, 0, BAR_THICK)
+        end
+
+        Library:AddToRegistry(AccentBar, {
+            BackgroundColor3 = 'AccentColor';
+        }, true);
+        local finalWidth = XSize + 8 + 4
+        if barSide == 'Left' or barSide == 'Right' then
+            finalWidth = finalWidth + BAR_THIN
+        end
+        pcall(NotifyOuter.TweenSize, NotifyOuter,
+            UDim2.new(0, finalWidth, 0, YSize), 'Out', 'Quad', 0.4, true);
+        task.spawn(function()
+            wait(Time or 5);
+            pcall(NotifyOuter.TweenSize, NotifyOuter,
+                UDim2.new(0, 0, 0, YSize), 'Out', 'Quad', 0.4, true);
+            wait(0.4);
+            NotifyOuter:Destroy();
+        end);
+    end
 end
 
--- ------------------------------------------------------------
--- Watermark и Keybinds (из первого скрипта)
--- ------------------------------------------------------------
+-- Watermark and Keybinds (оставляем как в первом скрипте)
 do
     local WatermarkOuter = Library:Create('Frame', {
         BorderColor3 = Color3.new(0, 0, 0);
@@ -3195,7 +3128,7 @@ do
     local KeybindLabel = Library:CreateLabel({
         Size = UDim2.new(1, 0, 0, 20);
         Position = UDim2.fromOffset(5, 2),
-        TextXAlignment = Enum.TextXAlignment.Left;
+        TextXAlignment = Enum.TextXAlignment.Left,
 
         Text = 'Keybinds';
         ZIndex = 104;
@@ -3250,9 +3183,6 @@ function Library:SetWatermark(Text)
     Library.WatermarkText.Text = Text;
 end;
 
--- ------------------------------------------------------------
--- Окно (главное меню) – без изменений
--- ------------------------------------------------------------
 function Library:CreateWindow(...)
     local Arguments = { ... }
     local Config = { AnchorPoint = Vector2.zero }
@@ -3984,9 +3914,6 @@ function Library:CreateWindow(...)
     return Window;
 end;
 
--- ------------------------------------------------------------
--- Обработка обновления списков игроков/команд
--- ------------------------------------------------------------
 local function OnPlayerChange()
     local PlayerList = GetPlayersString();
     for _, Value in next, Options do
@@ -3999,9 +3926,6 @@ end;
 Players.PlayerAdded:Connect(OnPlayerChange);
 Players.PlayerRemoving:Connect(OnPlayerChange);
 
--- ------------------------------------------------------------
--- Мобильный интерфейс (кнопки Toggle/Lock)
--- ------------------------------------------------------------
 if InputService.TouchEnabled then
     local MobileGui = Instance.new("ScreenGui")
     MobileGui.Name = "LinoriaMobileUI"
