@@ -62,7 +62,7 @@ local Library = {
     };
 };
 
-_G.UIUnlocked = false; -- для блокировки перемещения на мобилке
+_G.UIUnlocked = false; -- блокировка перемещения на мобилке
 
 Library.KeyPickerList = {};
 
@@ -231,7 +231,6 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
     Instance.Active = true;
     Instance.InputBegan:Connect(function(Input)
         if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-            -- Блокировка перемещения на мобилке, если UIUnlocked = false
             if IsWindow and InputService.TouchEnabled and not _G.UIUnlocked then
                 return
             end
@@ -2871,7 +2870,8 @@ do
     end;
 end;
 
--- Notification system (улучшенный: появляются сверху, уходят вниз)
+-- ====== УВЕДОМЛЕНИЯ (обновлённые) ======
+-- Стандартные уведомления сверху с LayoutOrder и VerticalAlignment.Top
 do
     Library.NotificationArea = Library:Create('Frame', {
         BackgroundTransparency = 1;
@@ -2884,7 +2884,7 @@ do
         Padding = UDim.new(0, 4);
         FillDirection = Enum.FillDirection.Vertical;
         SortOrder = Enum.SortOrder.LayoutOrder;
-        VerticalAlignment = Enum.VerticalAlignment.Top; -- уведомления сверху
+        VerticalAlignment = Enum.VerticalAlignment.Top;
         Parent = Library.NotificationArea;
     });
     local function Library_UpdateNotifAlignment()
@@ -2942,7 +2942,7 @@ do
             BackgroundTransparency = 1;
             AnchorPoint = outerAnchor;
             BorderColor3 = Color3.new(0, 0, 0);
-            LayoutOrder = childrenCount + 1; -- новые уведомления добавляются снизу
+            LayoutOrder = childrenCount + 1;
             Size = UDim2.new(0, 0, 0, YSize);
             ClipsDescendants = true;
             ZIndex = 100;
@@ -3034,7 +3034,131 @@ do
     end
 end
 
--- Watermark and Keybinds (оставляем как в первом скрипте)
+-- ====== НОВЫЕ УВЕДОМЛЕНИЯ: BOTTOM CENTER с анимацией расширения ======
+Library.NotificationAreaBottom = Library:Create('Frame', {
+    BackgroundTransparency = 1;
+    Position = UDim2.new(0.5, 0, 1, -20);
+    AnchorPoint = Vector2.new(0.5, 1);
+    Size = UDim2.new(0, 300, 0, 0);
+    AutomaticSize = Enum.AutomaticSize.Y;
+    ZIndex = 100;
+    Parent = ScreenGui;
+});
+Library.NotifLayoutBottom = Library:Create('UIListLayout', {
+    Padding = UDim.new(0, 4);
+    FillDirection = Enum.FillDirection.Vertical;
+    SortOrder = Enum.SortOrder.LayoutOrder;
+    VerticalAlignment = Enum.VerticalAlignment.Bottom;
+    HorizontalAlignment = Enum.HorizontalAlignment.Center;
+    Parent = Library.NotificationAreaBottom;
+});
+
+function Library:NotifyBottomCenter(Text, Time)
+    local XSize, YSize = Library:GetTextBounds(Text, Library.Font, Library.FontSize)
+    YSize = YSize + 7
+    local BAR_THICK = 3
+    local finalWidth = XSize + 8 + 4
+    local maxWidth = 300
+    if finalWidth > maxWidth then finalWidth = maxWidth end
+
+    local Wrap = Library:Create('Frame', {
+        BackgroundTransparency = 1;
+        Size = UDim2.new(1, 0, 0, YSize);
+        ZIndex = 100;
+        Parent = Library.NotificationAreaBottom;
+    });
+
+    local NotifyOuter = Library:Create('Frame', {
+        AnchorPoint = Vector2.new(0.5, 0.5);
+        Position = UDim2.new(0.5, 0, 0.5, 0);
+        BackgroundColor3 = Color3.new(0, 0, 0);
+        BorderColor3 = Color3.new(0, 0, 0);
+        Size = UDim2.new(0, 0, 0, YSize);
+        ClipsDescendants = true;
+        ZIndex = 100;
+        Parent = Wrap;
+    });
+
+    local NotifyInner = Library:Create('Frame', {
+        BackgroundColor3 = Library.MainColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 101;
+        Parent = NotifyOuter;
+    });
+    Library:AddToRegistry(NotifyInner, {
+        BackgroundColor3 = 'MainColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+
+    local InnerFrame = Library:Create('Frame', {
+        BackgroundColor3 = Color3.new(1, 1, 1);
+        BorderSizePixel = 0;
+        Position = UDim2.new(0, 1, 0, BAR_THICK + 1);
+        Size = UDim2.new(1, -2, 1, -(BAR_THICK + 2));
+        ZIndex = 102;
+        Parent = NotifyInner;
+    });
+    local Gradient = Library:Create('UIGradient', {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
+            ColorSequenceKeypoint.new(1, Library.MainColor),
+        });
+        Rotation = -90;
+        Parent = InnerFrame;
+    });
+    Library:AddToRegistry(Gradient, {
+        Color = function()
+            return ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
+                ColorSequenceKeypoint.new(1, Library.MainColor),
+            });
+        end
+    });
+
+    local NotifyLabel = Library:CreateLabel({
+        Position = UDim2.new(0, 4, 0, 0);
+        Size = UDim2.new(1, -8, 1, 0);
+        Text = Text;
+        TextXAlignment = Enum.TextXAlignment.Center;
+        TextSize = Library.FontSize;
+        ZIndex = 103;
+        Parent = InnerFrame;
+    });
+
+    local AccentBar = Library:Create('Frame', {
+        BackgroundColor3 = Library.AccentColor;
+        BorderSizePixel = 0;
+        Position = UDim2.new(0, -1, 0, -1);
+        Size = UDim2.new(1, 2, 0, BAR_THICK);
+        ZIndex = 104;
+        Parent = NotifyOuter;
+    });
+    Library:AddToRegistry(AccentBar, {
+        BackgroundColor3 = 'AccentColor';
+    }, true);
+
+    -- Анимация появления
+    local tweenIn = TweenService:Create(NotifyOuter, 
+        TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Size = UDim2.new(0, finalWidth, 0, YSize)}
+    )
+    tweenIn:Play()
+
+    task.spawn(function()
+        wait(Time or 5)
+        local tweenOut = TweenService:Create(NotifyOuter,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Size = UDim2.new(0, 0, 0, YSize)}
+        )
+        tweenOut:Play()
+        tweenOut.Completed:Wait()
+        Wrap:Destroy()
+    end)
+end
+
+-- ====== ВОДЯНОЙ ЗНАК И KEYBINDS (из первого скрипта) ======
 do
     local WatermarkOuter = Library:Create('Frame', {
         BorderColor3 = Color3.new(0, 0, 0);
@@ -3128,7 +3252,7 @@ do
     local KeybindLabel = Library:CreateLabel({
         Size = UDim2.new(1, 0, 0, 20);
         Position = UDim2.fromOffset(5, 2),
-        TextXAlignment = Enum.TextXAlignment.Left,
+        TextXAlignment = Enum.TextXAlignment.Left;
 
         Text = 'Keybinds';
         ZIndex = 104;
@@ -3260,7 +3384,7 @@ function Library:CreateWindow(...)
         Text = 'Loading...',
         TextColor3 = Library.AccentColor,
         TextXAlignment = Enum.TextXAlignment.Right,
-        ZIndex = 1,
+        ZIndex = 1;
         Parent = Inner;
     });
     Library:AddToRegistry(MapNameLabel, {
