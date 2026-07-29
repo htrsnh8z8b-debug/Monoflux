@@ -307,57 +307,84 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
 end;
 
 function Library:AddToolTip(InfoStr, HoverInstance)
-    local X, Y = Library:GetTextBounds(InfoStr, Library.Font, Library.FontSize);
+    local X, Y = Library:GetTextBounds(InfoStr, Library.Font, Library.FontSize)
     local Tooltip = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor,
         BorderColor3 = Library.OutlineColor,
-
         Size = UDim2.fromOffset(X + 5, Y + 4),
         ZIndex = 100,
         Parent = Library.ScreenGui,
-
         Visible = false,
     })
 
     local Label = Library:CreateLabel({
         Position = UDim2.fromOffset(3, 1),
-        Size = UDim2.fromOffset(X, Y);
-        TextSize = Library.FontSize;
+        Size = UDim2.fromOffset(X, Y),
+        TextSize = Library.FontSize,
         Text = InfoStr,
         TextColor3 = Library.FontColor,
-        TextXAlignment = Enum.TextXAlignment.Left;
+        TextXAlignment = Enum.TextXAlignment.Left,
         ZIndex = Tooltip.ZIndex + 1,
+        Parent = Tooltip,
+    })
 
-        Parent = Tooltip;
-    });
     Library:AddToRegistry(Tooltip, {
-        BackgroundColor3 = 'MainColor';
-        BorderColor3 = 'OutlineColor';
-    });
+        BackgroundColor3 = 'MainColor',
+        BorderColor3 = 'OutlineColor',
+    })
     Library:AddToRegistry(Label, {
         TextColor3 = 'FontColor',
-    });
-    local IsHovering = false
+    })
+
+    local heartbeatConnection = nil
+    local isHovering = false
+
+    local function startUpdating()
+        if heartbeatConnection then return end
+        heartbeatConnection = RunService.Heartbeat:Connect(function()
+            if Tooltip and Tooltip.Parent then
+                Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
+            else
+                stopUpdating()
+            end
+        end)
+    end
+
+    local function stopUpdating()
+        if heartbeatConnection then
+            heartbeatConnection:Disconnect()
+            heartbeatConnection = nil
+        end
+        if Tooltip then
+            Tooltip.Visible = false
+        end
+        isHovering = false
+    end
 
     HoverInstance.MouseEnter:Connect(function()
-        if Library:MouseIsOverOpenedFrame() then
-            return
-        end
-
-        IsHovering = true
-
-        Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
+        if Library:MouseIsOverOpenedFrame() then return end
+        isHovering = true
         Tooltip.Visible = true
-
-        while IsHovering do
-            RunService.Heartbeat:Wait()
-            Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
-        end
+        Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
+        startUpdating()
     end)
 
     HoverInstance.MouseLeave:Connect(function()
-        IsHovering = false
-        Tooltip.Visible = false
+        stopUpdating()
+    end)
+
+    -- На случай, если HoverInstance уничтожен без срабатывания MouseLeave
+    HoverInstance.AncestryChanged:Connect(function()
+        if not HoverInstance:IsDescendantOf(game) then
+            stopUpdating()
+        end
+    end)
+
+    -- Также очищаем при удалении самой подсказки
+    Tooltip.AncestryChanged:Connect(function()
+        if not Tooltip:IsDescendantOf(game) then
+            stopUpdating()
+        end
     end)
 end
 
