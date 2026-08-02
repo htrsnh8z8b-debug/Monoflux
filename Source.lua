@@ -60,14 +60,12 @@ local Library = {
         PositionX = 0;
         PositionY = 40;
     };
-
-    _CursorConnection = nil;
-    _CursorObjects = nil;
 };
 
-_G.UIUnlocked = false;
+_G.UIUnlocked = false; -- блокировка перемещения на мобилке
 
 Library.KeyPickerList = {};
+Library.CursorLoopRunning = false;
 
 Library.BlurEffect = Instance.new("BlurEffect")
 Library.BlurEffect.Name = "LinoriaBlur"
@@ -211,7 +209,7 @@ function Library:ApplyTextStroke(Inst)
 end;
 
 function Library:ApplyGlow(Inst)
-    -- Пустая функция
+
 end;
 
 function Library:CreateLabel(Properties, IsHud)
@@ -309,28 +307,30 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
     end)
 end;
 
--- ИСПРАВЛЕННАЯ ФУНКЦИЯ ПОДСКАЗОК (БЕЗ БЕСКОНЕЧНОГО ЦИКЛА)
 function Library:AddToolTip(InfoStr, HoverInstance)
-    local X, Y = Library:GetTextBounds(InfoStr, Library.Font, Library.FontSize)
+    local X, Y = Library:GetTextBounds(InfoStr, Library.Font, Library.FontSize);
     local Tooltip = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor,
         BorderColor3 = Library.OutlineColor,
+
         Size = UDim2.fromOffset(X + 5, Y + 4),
         ZIndex = 100,
         Parent = Library.ScreenGui,
+
         Visible = false,
     })
 
     local Label = Library:CreateLabel({
         Position = UDim2.fromOffset(3, 1),
-        Size = UDim2.fromOffset(X, Y),
-        TextSize = Library.FontSize,
+        Size = UDim2.fromOffset(X, Y);
+        TextSize = Library.FontSize;
         Text = InfoStr,
         TextColor3 = Library.FontColor,
-        TextXAlignment = Enum.TextXAlignment.Left,
+        TextXAlignment = Enum.TextXAlignment.Left;
         ZIndex = Tooltip.ZIndex + 1,
-        Parent = Tooltip,
-    })
+
+        Parent = Tooltip;
+    });
     Library:AddToRegistry(Tooltip, {
         BackgroundColor3 = 'MainColor';
         BorderColor3 = 'OutlineColor';
@@ -338,55 +338,34 @@ function Library:AddToolTip(InfoStr, HoverInstance)
     Library:AddToRegistry(Label, {
         TextColor3 = 'FontColor',
     });
+    local IsHovering = false
 
-    local heartbeatConnection = nil
-
-    local function stopUpdating()
-        if heartbeatConnection then
-            heartbeatConnection:Disconnect()
-            heartbeatConnection = nil
-        end
-        if Tooltip and Tooltip.Parent then
-            Tooltip.Visible = false
-        end
-    end
-
-    local function startUpdating()
-        if heartbeatConnection then return end
-        heartbeatConnection = RunService.Heartbeat:Connect(function()
-            if Tooltip and Tooltip.Parent then
-                Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
-            else
-                stopUpdating()
-            end
-        end)
-    end
-
+    local TooltipLoop = nil
     HoverInstance.MouseEnter:Connect(function()
         if Library:MouseIsOverOpenedFrame() then
             return
         end
-        if Tooltip and Tooltip.Parent then
-            Tooltip.Visible = true
-            Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
-            startUpdating()
-        end
+
+        IsHovering = true
+        Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
+        Tooltip.Visible = true
+
+        if TooltipLoop then return end
+        TooltipLoop = true
+        task.spawn(function()
+            while IsHovering do
+                RunService.Heartbeat:Wait()
+                if Tooltip and Tooltip.Parent then
+                    Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
+                end
+            end
+            TooltipLoop = nil
+        end)
     end)
 
     HoverInstance.MouseLeave:Connect(function()
-        stopUpdating()
-    end)
-
-    HoverInstance.AncestryChanged:Connect(function()
-        if not HoverInstance:IsDescendantOf(game) then
-            stopUpdating()
-        end
-    end)
-
-    Tooltip.AncestryChanged:Connect(function()
-        if not Tooltip:IsDescendantOf(game) then
-            stopUpdating()
-        end
+        IsHovering = false
+        Tooltip.Visible = false
     end)
 end
 
@@ -418,13 +397,16 @@ end;
 
 function Library:MouseIsOverOpenedFrame()
     for Frame, _ in next, Library.OpenedFrames do
-        local AbsPos, AbsSize = Frame.AbsolutePosition, Frame.AbsoluteSize;
-        if Mouse.X >= AbsPos.X and Mouse.X <= AbsPos.X + AbsSize.X
-            and Mouse.Y >= AbsPos.Y and Mouse.Y <= AbsPos.Y + AbsSize.Y then
+        if Frame and Frame.Parent then
+            local AbsPos, AbsSize = Frame.AbsolutePosition, Frame.AbsoluteSize;
+            if Mouse.X >= AbsPos.X and Mouse.X <= AbsPos.X + AbsSize.X
+                and Mouse.Y >= AbsPos.Y and Mouse.Y <= AbsPos.Y + AbsSize.Y then
 
-            return true;
-        end;
+                return true;
+            end;
+        end
     end;
+    return false;
 end;
 
 function Library:IsMouseOverFrame(Frame)
@@ -495,14 +477,20 @@ function Library:RemoveFromRegistry(Instance)
 end;
 
 function Library:UpdateColorsUsingRegistry()
-    for Idx, Object in next, Library.Registry do
-        for Property, ColorIdx in next, Object.Properties do
-            if type(ColorIdx) == 'string' then
-                Object.Instance[Property] = Library[ColorIdx];
-            elseif type(ColorIdx) == 'function' then
-                Object.Instance[Property] = ColorIdx()
-            end
-        end;
+    for Idx = #Library.Registry, 1, -1 do
+        local Object = Library.Registry[Idx]
+        if not Object.Instance or not Object.Instance.Parent then
+            table.remove(Library.Registry, Idx)
+            if Object.Instance then Library.RegistryMap[Object.Instance] = nil end
+        else
+            for Property, ColorIdx in next, Object.Properties do
+                if type(ColorIdx) == 'string' then
+                    Object.Instance[Property] = Library[ColorIdx];
+                elseif type(ColorIdx) == 'function' then
+                    Object.Instance[Property] = ColorIdx()
+                end
+            end;
+        end
     end;
 end;
 
@@ -511,25 +499,13 @@ function Library:GiveSignal(Signal)
 end
 
 function Library:Unload()
-    -- Очищаем курсор при выгрузке
-    if Library._CursorConnection then
-        Library._CursorConnection:Disconnect()
-        Library._CursorConnection = nil
-    end
-    if Library._CursorObjects then
-        for _, obj in ipairs(Library._CursorObjects) do
-            if obj then pcall(function() obj:Remove() end) end
-        end
-        Library._CursorObjects = nil
-    end
-
     for Idx = #Library.Signals, 1, -1 do
         local Connection = table.remove(Library.Signals, Idx)
         Connection:Disconnect()
     end
 
-    if Library.OnUnload then
-        Library.OnUnload()
+    if Library._UnloadCallback then
+        Library._UnloadCallback()
     end
     
     if Library.BlurEffect then
@@ -539,8 +515,9 @@ function Library:Unload()
     ScreenGui:Destroy()
 end
 
+Library._UnloadCallback = nil
 function Library:OnUnload(Callback)
-    Library.OnUnload = Callback
+    Library._UnloadCallback = Callback
 end
 
 Library:GiveSignal(ScreenGui.DescendantRemoving:Connect(function(Instance)
@@ -1361,7 +1338,7 @@ do
                 if Key == 'MB1' or Key == 'MB2' or Key == 'Touch' then
                     return Key == 'MB1' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
                         or Key == 'MB2' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-                        or Key == 'Touch' and true
+                        or Key == 'Touch' and InputService:IsMouseButtonPressed(Enum.UserInputType.Touch)
                 else
                     return InputService:IsKeyDown(Enum.KeyCode[KeyPicker.Value]);
                 end;
@@ -1665,7 +1642,6 @@ do
 
         return unpack(Boxes)
     end;
-
     function Funcs:AddLabel(Text, DoesWrap)
         local Label = {};
 
@@ -1716,7 +1692,6 @@ do
 
         return Label;
     end;
-
     function Funcs:AddButton(...)
         local Button = {};
         local function ProcessButtonParams(Class, Obj, ...)
@@ -1796,7 +1771,7 @@ do
                     end
                 end)
                 task.delay(timeout, function()
-                    connection:disconnect()
+                    connection:Disconnect()
                     bindable:Fire(false)
                 end)
                 return bindable.Event:Wait()
@@ -2347,6 +2322,7 @@ do
                 return math.floor(Value);
             end;
 
+
             return tonumber(string.format('%.' .. Slider.Rounding .. 'f', Value))
         end;
         function Slider:GetValueFromXOffset(X)
@@ -2415,7 +2391,6 @@ do
 
         return Slider;
     end;
-
     function Funcs:AddDropdown(Idx, Info)
         if Info.SpecialType == 'Player' then
             Info.Values = GetPlayersString();
@@ -2780,7 +2755,7 @@ do
                 end;
             end;
         end);
-        InputService.InputBegan:Connect(function(Input)
+        Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
                 local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
 
@@ -2790,7 +2765,7 @@ do
                     Dropdown:CloseDropdown();
                 end;
             end;
-        end);
+        end));
         Dropdown:BuildDropdownList();
         Dropdown:Display();
 
@@ -2835,7 +2810,6 @@ do
 
         return Dropdown;
     end;
-
     function Funcs:AddDependencyBox()
         local Depbox = {
             Dependencies = {};
@@ -2914,7 +2888,8 @@ do
     end;
 end;
 
--- ====== УВЕДОМЛЕНИЯ ======
+-- ====== УВЕДОМЛЕНИЯ (обновлённые) ======
+-- Стандартные уведомления сверху с LayoutOrder и VerticalAlignment.Top
 do
     Library.NotificationArea = Library:Create('Frame', {
         BackgroundTransparency = 1;
@@ -3065,19 +3040,143 @@ do
         if barSide == 'Left' or barSide == 'Right' then
             finalWidth = finalWidth + BAR_THIN
         end
-        pcall(NotifyOuter.TweenSize, NotifyOuter,
-            UDim2.new(0, finalWidth, 0, YSize), 'Out', 'Quad', 0.4, true);
+        local tweenIn = TweenService:Create(NotifyOuter, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, finalWidth, 0, YSize)})
+        tweenIn:Play()
         task.spawn(function()
             wait(Time or 5);
-            pcall(NotifyOuter.TweenSize, NotifyOuter,
-                UDim2.new(0, 0, 0, YSize), 'Out', 'Quad', 0.4, true);
-            wait(0.4);
+            local tweenOut = TweenService:Create(NotifyOuter, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 0, 0, YSize)})
+            tweenOut:Play()
+            tweenOut.Completed:Wait()
             NotifyOuter:Destroy();
         end);
     end
 end
 
--- ====== ВОДЯНОЙ ЗНАК И KEYBINDS ======
+-- ====== НОВЫЕ УВЕДОМЛЕНИЯ: BOTTOM CENTER с анимацией расширения ======
+Library.NotificationAreaBottom = Library:Create('Frame', {
+    BackgroundTransparency = 1;
+    Position = UDim2.new(0.5, 0, 1, -20);
+    AnchorPoint = Vector2.new(0.5, 1);
+    Size = UDim2.new(0, 300, 0, 0);
+    AutomaticSize = Enum.AutomaticSize.Y;
+    ZIndex = 100;
+    Parent = ScreenGui;
+});
+Library.NotifLayoutBottom = Library:Create('UIListLayout', {
+    Padding = UDim.new(0, 4);
+    FillDirection = Enum.FillDirection.Vertical;
+    SortOrder = Enum.SortOrder.LayoutOrder;
+    VerticalAlignment = Enum.VerticalAlignment.Bottom;
+    HorizontalAlignment = Enum.HorizontalAlignment.Center;
+    Parent = Library.NotificationAreaBottom;
+});
+
+function Library:NotifyBottomCenter(Text, Time)
+    local XSize, YSize = Library:GetTextBounds(Text, Library.Font, Library.FontSize)
+    YSize = YSize + 7
+    local BAR_THICK = 3
+    local finalWidth = XSize + 8 + 4
+    local maxWidth = 300
+    if finalWidth > maxWidth then finalWidth = maxWidth end
+
+    local Wrap = Library:Create('Frame', {
+        BackgroundTransparency = 1;
+        Size = UDim2.new(1, 0, 0, YSize);
+        ZIndex = 100;
+        Parent = Library.NotificationAreaBottom;
+    });
+
+    local NotifyOuter = Library:Create('Frame', {
+        AnchorPoint = Vector2.new(0.5, 0.5);
+        Position = UDim2.new(0.5, 0, 0.5, 0);
+        BackgroundColor3 = Color3.new(0, 0, 0);
+        BorderColor3 = Color3.new(0, 0, 0);
+        Size = UDim2.new(0, 0, 0, YSize);
+        ClipsDescendants = true;
+        ZIndex = 100;
+        Parent = Wrap;
+    });
+
+    local NotifyInner = Library:Create('Frame', {
+        BackgroundColor3 = Library.MainColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 101;
+        Parent = NotifyOuter;
+    });
+    Library:AddToRegistry(NotifyInner, {
+        BackgroundColor3 = 'MainColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+
+    local InnerFrame = Library:Create('Frame', {
+        BackgroundColor3 = Color3.new(1, 1, 1);
+        BorderSizePixel = 0;
+        Position = UDim2.new(0, 1, 0, BAR_THICK + 1);
+        Size = UDim2.new(1, -2, 1, -(BAR_THICK + 2));
+        ZIndex = 102;
+        Parent = NotifyInner;
+    });
+    local Gradient = Library:Create('UIGradient', {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
+            ColorSequenceKeypoint.new(1, Library.MainColor),
+        });
+        Rotation = -90;
+        Parent = InnerFrame;
+    });
+    Library:AddToRegistry(Gradient, {
+        Color = function()
+            return ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
+                ColorSequenceKeypoint.new(1, Library.MainColor),
+            });
+        end
+    });
+
+    local NotifyLabel = Library:CreateLabel({
+        Position = UDim2.new(0, 4, 0, 0);
+        Size = UDim2.new(1, -8, 1, 0);
+        Text = Text;
+        TextXAlignment = Enum.TextXAlignment.Center;
+        TextSize = Library.FontSize;
+        ZIndex = 103;
+        Parent = InnerFrame;
+    });
+
+    local AccentBar = Library:Create('Frame', {
+        BackgroundColor3 = Library.AccentColor;
+        BorderSizePixel = 0;
+        Position = UDim2.new(0, -1, 0, -1);
+        Size = UDim2.new(1, 2, 0, BAR_THICK);
+        ZIndex = 104;
+        Parent = NotifyOuter;
+    });
+    Library:AddToRegistry(AccentBar, {
+        BackgroundColor3 = 'AccentColor';
+    }, true);
+
+    -- Анимация появления
+    local tweenIn = TweenService:Create(NotifyOuter, 
+        TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Size = UDim2.new(0, finalWidth, 0, YSize)}
+    )
+    tweenIn:Play()
+
+    task.spawn(function()
+        wait(Time or 5)
+        local tweenOut = TweenService:Create(NotifyOuter,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Size = UDim2.new(0, 0, 0, YSize)}
+        )
+        tweenOut:Play()
+        tweenOut.Completed:Wait()
+        Wrap:Destroy()
+    end)
+end
+
+-- ====== ВОДЯНОЙ ЗНАК И KEYBINDS (из первого скрипта) ======
 do
     local WatermarkOuter = Library:Create('Frame', {
         BorderColor3 = Color3.new(0, 0, 0);
@@ -3245,8 +3344,11 @@ function Library:CreateWindow(...)
     if typeof(Config.Position) ~= 'UDim2' then Config.Position = UDim2.fromOffset(175, 50) end
 
     if InputService.TouchEnabled then
-        local vp = workspace.CurrentCamera.ViewportSize
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+        local vp = cam.ViewportSize
         local maxWidth = math.min(Config.Size.X.Offset, vp.X - 20)
+      
         local maxHeight = math.min(Config.Size.Y.Offset, vp.Y - 60)
         Config.Size = UDim2.fromOffset(maxWidth, maxHeight)
     end
@@ -3318,6 +3420,7 @@ function Library:CreateWindow(...)
             MapNameLabel.Text = game.Name or "Unknown Map"
         end
     end)
+
 
     local TabBarOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
@@ -3410,7 +3513,7 @@ function Library:CreateWindow(...)
         BackgroundColor3 = 'AccentColor';
     });
 
-    -- Ресайз окна
+    -- Ресайз окна (из второго скрипта)
     local ResizeWireframe = nil;
     local ResizeStartPos = nil;
     local ResizeStartSize = nil;
@@ -3457,7 +3560,7 @@ function Library:CreateWindow(...)
     end);
 
     InputService.InputChanged:Connect(function(input)
-        if IsResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input == CornerCircle.InputBegan) then
+        if IsResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - ResizeStartPos;
             UpdateResizeWireframe(delta);
         end
@@ -3478,7 +3581,6 @@ function Library:CreateWindow(...)
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
     end;
-
     function Window:AddTab(Name)
         local Tab = {
             Groupboxes = {};
@@ -3880,68 +3982,50 @@ function Library:CreateWindow(...)
         Modal = false;
         Parent = ScreenGui;
     });
-
-    -- ИСПРАВЛЕННАЯ ФУНКЦИЯ TOGGLE (БЕЗ БЕСКОНЕЧНОГО ЦИКЛА И С Pcall ДЛЯ DRAWING)
     function Library:Toggle()
         Library.Toggled = not Library.Toggled;
         ModalElement.Modal = Library.Toggled;
         Outer.Visible = Library.Toggled;
-        
-        -- Очищаем предыдущий курсор если был
-        if Library._CursorConnection then
-            Library._CursorConnection:Disconnect()
-            Library._CursorConnection = nil
-        end
-        if Library._CursorObjects then
-            for _, obj in ipairs(Library._CursorObjects) do
-                if obj then pcall(function() obj:Remove() end) end
-            end
-            Library._CursorObjects = nil
-        end
+        if Library.Toggled and not Library.CursorLoopRunning then
+            Library.CursorLoopRunning = true
+            task.spawn(function()
+                local State = InputService.MouseIconEnabled;
 
-        if Library.Toggled then
-            -- Кастомный курсор (только если доступен Drawing)
-            local Cursor, CursorOutline, connection
-            pcall(function()
-                Cursor = Drawing.new('Triangle')
-                Cursor.Thickness = 1
-                Cursor.Filled = true
-                Cursor.Visible = true
-                CursorOutline = Drawing.new('Triangle')
-                CursorOutline.Thickness = 1
-                CursorOutline.Filled = false
-                CursorOutline.Color = Color3.new(0, 0, 0)
-                CursorOutline.Visible = true
-            end)
-            
-            if Cursor then
-                local oldIconState = InputService.MouseIconEnabled
-                InputService.MouseIconEnabled = false
-                
-                connection = RunService.RenderStepped:Connect(function()
-                    if not Library.Toggled then
-                        InputService.MouseIconEnabled = oldIconState
-                        connection:Disconnect()
-                        if Cursor then pcall(function() Cursor:Remove() end) end
-                        if CursorOutline then pcall(function() CursorOutline:Remove() end) end
-                        return
-                    end
-                    local mPos = InputService:GetMouseLocation()
-                    Cursor.Color = Library.AccentColor
-                    Cursor.PointA = Vector2.new(mPos.X, mPos.Y)
-                    Cursor.PointB = Vector2.new(mPos.X + 16, mPos.Y + 6)
-                    Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + 16)
-                    CursorOutline.PointA = Cursor.PointA
-                    CursorOutline.PointB = Cursor.PointB
-                    CursorOutline.PointC = Cursor.PointC
-                end)
-                
-                Library._CursorConnection = connection
-                Library._CursorObjects = {Cursor, CursorOutline}
-            end
-        end
+                local Cursor = Drawing.new('Triangle');
+                Cursor.Thickness = 1;
+                Cursor.Filled = true;
+                Cursor.Visible = true;
 
-        -- Блюр
+                local CursorOutline = Drawing.new('Triangle');
+                CursorOutline.Thickness = 1;
+                CursorOutline.Filled = false;
+                CursorOutline.Color = Color3.new(0, 0, 0);
+                CursorOutline.Visible = true;
+
+                while Library.Toggled and ScreenGui.Parent do
+                    InputService.MouseIconEnabled = false;
+
+                    local mPos = InputService:GetMouseLocation();
+
+                    Cursor.Color = Library.AccentColor;
+
+                    Cursor.PointA = Vector2.new(mPos.X, mPos.Y);
+                    Cursor.PointB = Vector2.new(mPos.X + 16, mPos.Y + 6);
+                    Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + 16);
+                    CursorOutline.PointA = Cursor.PointA;
+                    CursorOutline.PointB = Cursor.PointB;
+                    CursorOutline.PointC = Cursor.PointC;
+
+                    RenderStepped:Wait();
+                end;
+
+                InputService.MouseIconEnabled = State;
+
+                Cursor:Remove();
+                CursorOutline:Remove();
+                Library.CursorLoopRunning = false
+            end);
+        end;
         if Library.UseBlur then
             if Library.Toggled then
                 Library.BlurEffect.Enabled = true
@@ -4122,6 +4206,11 @@ if InputService.TouchEnabled then
         LockBtn.Text = _G.UIUnlocked and "Lock UI" or "Unlock UI"
         LockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     end)
+
+    local _origUpdate = Library.UpdateColorsUsingRegistry
+    Library.UpdateColorsUsingRegistry = function(self)
+        _origUpdate(self)
+    end
 end
 
 getgenv().Library = Library
