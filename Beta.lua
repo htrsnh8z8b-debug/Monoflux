@@ -3,6 +3,4 @@
 -- Service: Test
 -- Generated for: inkwell1
 
-getgenv().SCRIPT_KEY = "74d00b53-90db-4658-b8e0-bb4bd5884d9b"
-
 loadstring(game:HttpGet("https://api.jnkie.com/api/v1/luascripts/public/a2dcafb01696647bc5eea80a6d43e201faa0029c34728f75bcc057a444904ec1/download"))()
